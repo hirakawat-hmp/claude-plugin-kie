@@ -33,7 +33,9 @@ claude-plugin-kie/
 ├── scripts/                     # shared runtime
 │   ├── call.sh                  # POST /api/v1/jobs/createTask
 │   ├── poll.sh                  # poll recordInfo until done
-│   └── upload.sh                # file upload helper
+│   ├── upload.sh                # file upload helper
+│   ├── query_graph.sh           # query knowledge graph (wrapper)
+│   └── query_graph.py           # NetworkX-based BFS/DFS over graph.json
 ├── docs/                        # snapshot of docs.kie.ai (194 markdown files)
 ├── graph/                       # pre-built knowledge graph via graphify
 │   ├── graph.json               # 1,107 nodes / 1,341 edges
@@ -49,13 +51,22 @@ See `reports/api-response-schema-analysis.md` for why kie.ai's unified `ApiRespo
 
 ## Setup
 
-### 1. Install the plugin
+### 1. Install prerequisites
 
-```bash
-# (installation method TBD — depends on how Claude Code plugin marketplace evolves)
+- **`uv`** — required for the graph query helper to auto-install its Python dependency (graphifyy/networkx). See [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/).
+- **`jq`** and **`curl`** — used by the runtime scripts for API calls and JSON parsing.
+
+On first use, `scripts/query_graph.sh` will auto-run `uv tool install graphifyy` if graphifyy is missing. No manual step required.
+
+### 2. Install the plugin in Claude Code
+
+```
+/plugin marketplace add https://github.com/hirakawat-hmp/claude-plugin-kie
+/plugin install kie@claude-plugin-kie
+/reload-plugins
 ```
 
-### 2. Store your kie.ai API key outside the plugin
+### 3. Store your kie.ai API key outside the plugin
 
 ```bash
 mkdir -p ~/.config/kie
