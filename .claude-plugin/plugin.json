@@ -1,0 +1,12 @@
+{
+  "name": "kie",
+  "version": "0.1.0",
+  "description": "kie.ai unified AI model API concierge — an agent that recommends models, checks credits, and executes generation requests on demand",
+  "author": {
+    "name": "reibniz",
+    "email": "reibniz@proton.me"
+  },
+  "repository": "https://github.com/hirakawat-hmp/claude-plugin-kie",
+  "license": "MIT",
+  "keywords": ["kie.ai", "ai", "music", "video", "image", "suno", "runway", "veo3", "flux", "kling"]
+}

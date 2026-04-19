@@ -1,30 +1,58 @@
 # claude-plugin-kie
 
-Claude Code skill for [kie.ai](https://kie.ai) — a unified API platform for AI models (Suno, Runway, Veo3, Flux, Ideogram, ElevenLabs, Claude, Gemini, GPT-5, Kling, Wan, Sora2, and more).
+A Claude Code plugin that installs a **kie.ai concierge agent**. When the conversation naturally arrives at "let's generate this with kie.ai", Claude delegates to this specialist — it recommends models, checks credits, builds the request from bundled docs, calls the API, and returns the result.
 
-## What it does
-
-Lets you generate music, video, images, and audio via kie.ai's API from inside Claude Code, without hand-writing HTTP requests. Claude reads the appropriate model's documentation (bundled as a knowledge graph) and builds the right request for you.
-
-```
-/kie "2分のジャズBGM、明るい雰囲気"      → Suno でmusic生成
-/kie "夕焼けの海辺を歩く人、5秒"         → Runway で動画生成
-/kie "サイバーパンク都市の夜景"          → Flux で画像生成
-```
+[kie.ai](https://kie.ai) is a unified API platform for 100+ AI models: Suno (music), Runway/Veo3/Kling/Wan/Sora2 (video), Flux/Ideogram/Seedream (image), ElevenLabs (audio), Claude/Gemini/GPT-5 (chat), and more.
 
 ## How it works
 
-1. **Bundled documentation** (`docs/`) — a snapshot of [docs.kie.ai](https://docs.kie.ai) (194 markdown files) covering every model's OpenAPI schema.
-2. **Pre-built knowledge graph** (`graph/graph.json`) — a NetworkX graph generated via [graphify](https://github.com/safishamsi/graphify) that encodes relationships between endpoints, parameters, models, and shared schemas. Enables ~69x token-efficient lookups.
-3. **Shared runtime scripts** (`scripts/`) — auth, `createTask` POST, `recordInfo` polling, file upload. All models share these because kie.ai normalizes responses into a single `ApiResponse` schema.
-4. **Claude as dispatcher** — given your natural-language intent, Claude queries the graph to find the right model, reads the specific endpoint doc, builds the request body, and calls the shared scripts.
+This plugin is **not** a slash command. It installs a specialist subagent (`kie-agent`) that Claude delegates to when appropriate:
+
+```
+User: "この動画にBGMほしいな"
+Claude: "kie.aiで作れますね、候補を確認します"
+  └─ (internally: Claude → kie-agent "suggest models for BGM")
+Claude: "Suno V5 と ElevenLabs sound-effect があります…"
+
+User: "Sunoで、2分、ジャズ系、歌詞なし"
+Claude: "残クレジット確認しますね"
+  └─ (internally: Claude → kie-agent "check credits")
+Claude: "5,243 credits 残っています。実行していい？"
+
+User: "うん"
+  └─ (internally: Claude → kie-agent "execute Suno generate-music with ...")
+Claude: "生成完了: https://..."
+```
+
+## What's inside
+
+```
+claude-plugin-kie/
+├── .claude-plugin/plugin.json  # plugin manifest
+├── agents/kie-agent.md          # the concierge subagent
+├── scripts/                     # shared runtime
+│   ├── call.sh                  # POST /api/v1/jobs/createTask
+│   ├── poll.sh                  # poll recordInfo until done
+│   └── upload.sh                # file upload helper
+├── docs/                        # snapshot of docs.kie.ai (194 markdown files)
+├── graph/                       # pre-built knowledge graph via graphify
+│   ├── graph.json               # 1,107 nodes / 1,341 edges
+│   └── GRAPH_REPORT.md
+└── reports/                     # architecture analysis
+```
+
+## Why bundle docs + graph?
+
+kie.ai adds new models frequently. The bundled `docs/` is a pinned snapshot, and `graph/graph.json` is a pre-computed knowledge graph (via [graphify](https://github.com/safishamsi/graphify)) that lets the agent find the right endpoint ~69x more token-efficiently than reading raw docs.
+
+See `reports/api-response-schema-analysis.md` for why kie.ai's unified `ApiResponse` schema enables shared runtime scripts across all 100+ models.
 
 ## Setup
 
-### 1. Install graphify (optional — only needed to refresh the graph)
+### 1. Install the plugin
 
 ```bash
-uv tool install graphifyy
+# (installation method TBD — depends on how Claude Code plugin marketplace evolves)
 ```
 
 ### 2. Store your kie.ai API key outside the plugin
@@ -35,31 +63,20 @@ echo 'export KIE_API_KEY=your_key_here' > ~/.config/kie/env
 chmod 600 ~/.config/kie/env
 ```
 
-The plugin's scripts `source` this file — the API key is never committed to the repo.
-
-### 3. Clone the plugin
-
-```bash
-git clone git@github.com:hirakawat-hmp/claude-plugin-kie.git ~/.claude/plugins/kie
-```
-
-_(Plugin registration details TBD — this is a work in progress.)_
+The agent's scripts `source` this file — the API key never enters the Claude context and is never committed to the repo.
 
 ## Refreshing the documentation
 
-kie.ai adds new models frequently. To refresh the bundled docs and rebuild the knowledge graph:
-
-```bash
-/kie refresh-docs
-```
-
-## Design notes
-
-See `reports/api-response-schema-analysis.md` for analysis of why kie.ai's unified `ApiResponse` schema makes this plugin architecture possible with shared runtime code.
+kie.ai adds new models frequently. To refresh the bundled docs and rebuild the knowledge graph, the agent includes a `refresh-docs` procedure (TBD — likely triggered by explicit user request like "kie.aiのドキュメント更新して").
 
 ## Status
 
-Work in progress. See `SKILL.md` for the current Skill specification.
+**Work in progress.** Current state:
+- ✅ Docs snapshot (194 files) bundled
+- ✅ Knowledge graph built
+- ⏳ `agents/kie-agent.md` (implementation)
+- ⏳ `scripts/call.sh` and `scripts/poll.sh`
+- ⏳ End-to-end testing
 
 ## License
 
