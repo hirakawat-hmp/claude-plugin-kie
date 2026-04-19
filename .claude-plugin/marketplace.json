@@ -1,5 +1,4 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "claude-plugin-kie",
   "description": "Single-plugin marketplace exposing the kie.ai concierge agent for Claude Code",
   "owner": {
@@ -11,7 +10,10 @@
       "name": "kie",
       "description": "kie.ai unified AI model API concierge — an agent that recommends models, checks credits, and executes generation requests on demand",
       "category": "productivity",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "hirakawat-hmp/claude-plugin-kie"
+      },
       "homepage": "https://github.com/hirakawat-hmp/claude-plugin-kie"
     }
   ]
