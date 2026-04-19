@@ -64,13 +64,35 @@ All paths are rooted at `${CLAUDE_PLUGIN_ROOT}`:
 - **`graph/GRAPH_REPORT.md`** — human-readable summary of the knowledge graph (communities, god nodes, common schemas). Useful for understanding the platform shape.
 - **`reports/api-response-schema-analysis.md`** — explains kie.ai's unified `ApiResponse` contract (every endpoint returns `{code, msg, data: {taskId}}`, then clients poll `recordInfo`).
 
-## Graph Query Helper
+## First Step for ANY Lookup: query_graph.sh
 
-`${CLAUDE_PLUGIN_ROOT}/scripts/query_graph.sh "<question>" [--budget N] [--dfs] [--depth N]`
+**Before running Grep, Glob, or Read on `docs/`, you MUST first try `scripts/query_graph.sh`.** This is not optional — the knowledge graph is why this plugin is token-efficient (~69x reduction per query vs. raw-file search). Skipping it means wasting context.
 
-- Uses networkx (via the `graphifyy` uv tool — auto-installed on first use) to run BFS/DFS from nodes whose labels match question terms, then prints matched nodes + edges in a compact form. Honor a token budget (default 2000) to keep context lean.
-- Prefer this over reading `graph.json` directly. For pure filename/keyword lookups that don't need graph structure, Grep/Glob on `docs/` is still faster.
-- Requires `uv` to be installed on the user's system. If `uv` is missing, fall back to Grep on `docs/` and mention the limitation to the caller.
+```
+Bash: bash ${CLAUDE_PLUGIN_ROOT}/scripts/query_graph.sh "<keywords from the user's intent>"
+```
+
+**When to use it:**
+- Finding which model/endpoint fits a use case → always
+- Locating the right doc file to Read before building a request → always
+- Checking what parameters an endpoint supports → always
+- Discovering related endpoints (callbacks, status lookups, file inputs) → always
+
+**Arguments:**
+- Positional: keywords (a few strong terms beat many weak ones)
+- `--budget N`: token budget for output (default 2000 — only raise for broad exploratory queries)
+- `--dfs`: depth-first when tracing a chain (e.g. "how does Suno cover generation connect to vocal separation")
+- `--depth N`: traversal depth (default 2)
+
+**How to read the output:**
+- First block lists "matched start nodes" — these are the 1-3 best label matches for your query
+- Then ranked nodes (by term overlap) with their source file paths → Read those files if you need details
+- Then edges showing relations (`has_parameter`, `returns`, `belongs_to_api`, `translation_of`, etc.) with confidence tags
+
+**Fallback policy:**
+- If the script exits with "no matching nodes found", broaden keywords and retry once
+- If it exits with "uv not found", Grep `docs/` is acceptable — and warn the caller that the user should install `uv` to enable fast graph lookup
+- Never skip `query_graph.sh` just because "Grep might work" — the graph finds connections Grep misses (e.g. a Suno endpoint's callback schema lives in a separate file)
 
 ## Knowledge Base Structure
 
@@ -103,9 +125,9 @@ All API execution goes through `${CLAUDE_PLUGIN_ROOT}/scripts/`:
 ### For model recommendation tasks
 
 1. Parse the use case from the caller's brief (music? video? image? duration? style?).
-2. First, run `scripts/query_graph.sh` with keywords from the use case (e.g. `"anime image generate"`) — the output lists candidate endpoints and their related nodes (params, schemas) from the knowledge graph. Use this to narrow down to 3-5 models.
-3. If the graph query returns nothing useful (or `uv` is unavailable), fall back to Glob patterns on `docs/` — e.g. `docs/**/text-to-video*.md` for video-from-text.
-4. For the 3-5 candidates, read the relevant doc file and extract: model name, key input params, documented strengths/constraints.
+2. **Run `scripts/query_graph.sh` with use-case keywords** (e.g. `"anime image generate"`, `"bgm music generate"`, `"image-to-video 10 seconds"`). The output's ranked nodes + source file paths tell you which 3-5 candidates to investigate.
+3. Only Read the specific doc file(s) returned by the graph query — do NOT browse `docs/` blindly.
+4. From each doc, extract: model name, key input params, documented strengths/constraints.
 5. Return a compact comparison: model id · what it's best at · notable limits (max duration, resolution caps, NSFW policy).
 6. Do **not** pad the list — better to return 3 strong matches than 10 weak ones.
 
@@ -116,7 +138,7 @@ All API execution goes through `${CLAUDE_PLUGIN_ROOT}/scripts/`:
 
 ### For execution tasks
 
-1. Identify the exact model and endpoint from the caller's brief.
+1. **Run `scripts/query_graph.sh "<model-id or endpoint-name>"`** to locate the correct doc file — even if the caller specified the model explicitly. The graph query will return the doc path plus related nodes (callback schema, record-info endpoint) you'll need downstream.
 2. Read the specific doc file (e.g. `docs/suno-api/generate-music.md`). These files contain the full OpenAPI YAML with `required`, `enum`, `minimum`/`maximum`, and examples.
 3. Validate caller-provided params against the schema. If required fields are missing, **ask the caller for clarification** rather than guessing.
 4. Build the request body as JSON, honoring defaults and constraints.

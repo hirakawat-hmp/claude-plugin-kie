@@ -1,6 +1,6 @@
 {
   "name": "kie",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "kie.ai unified AI model API concierge — an agent that recommends models, checks credits, and executes generation requests on demand",
   "author": {
     "name": "reibniz",
